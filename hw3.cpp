@@ -27,6 +27,7 @@
 #include <imageIO.h>
 #include <cmath>
 #include "point.h"
+#include "utils.h"
 
 #define MAX_TRIANGLES 20000
 #define MAX_SPHERES 100
@@ -43,8 +44,8 @@ int mode = MODE_DISPLAY;
 // While solving the homework, it is useful to make the below values smaller for debugging purposes.
 // The still images that you need to submit with the homework should be at the below resolution (640x480).
 // However, for your own purposes, after you have solved the homework, you can increase those values to obtain higher-resolution images.
-#define WIDTH 640
-#define HEIGHT 480
+#define WIDTH 320
+#define HEIGHT 240
 
 // The field of view of the camera, in degrees.
 #define fov 60.0
@@ -93,6 +94,8 @@ int num_triangles = 0;
 int num_spheres = 0;
 int num_lights = 0;
 
+unsigned long counter = 0;
+
 void plot_pixel_display(int x, int y, unsigned char r, unsigned char g, unsigned char b);
 void plot_pixel_jpeg(int x, int y, unsigned char r, unsigned char g, unsigned char b);
 void plot_pixel(int x, int y, unsigned char r, unsigned char g, unsigned char b);
@@ -109,9 +112,9 @@ void draw_scene()
     {
       // A simple R,G,B output for testing purposes.
       // Modify these R,G,B colors to the values computed by your ray tracer.
-      unsigned char r = x % 256;       // modify
-      unsigned char g = y % 256;       // modify
-      unsigned char b = (x + y) % 256; // modify
+      unsigned char r = image[x][y][0] * 255;
+      unsigned char g = image[x][y][1] * 255;
+      unsigned char b = image[x][y][2] * 255;
       plot_pixel(x, y, r, g, b);
     }
     glEnd();
@@ -299,31 +302,101 @@ void idle()
   once = 1;
 }
 
+bool intersectSphere(Point direction)
+{
+  direction.normalize();
+  // cout << "direction:" << direction << " magnitude:" << direction.magnitude() << endl;
+  for (int i = 0; i < num_spheres; i++)
+  {
+    double xc = spheres[i].position[0];
+    double yc = spheres[i].position[1];
+    double zc = spheres[i].position[2];
+    double r = spheres[i].radius;
+
+    double xd = direction.x;
+    double yd = direction.y;
+    double zd = direction.z;
+
+    // x0, y0, z0 = 0
+    double b = 2 * ((xd * -xc) + (yd * -yc) + (zd * -zc));
+    double c = sq(xc) + sq(yc) + sq(zc) - sq(r);
+
+    double determinant = (b * b) - 4 * c;
+
+    // no real solutions
+    if (determinant < 0)
+      continue;
+
+    double t0, t1;
+    if (determinant == 0)
+    {
+      t0 = t1 = -b / 2;
+    }
+    else
+    {
+      t0 = (-b - sqrt(determinant)) / 2;
+      t1 = (-b + sqrt(determinant)) / 2;
+    }
+
+    // cout << "t0:" << t0 << " t1:" << t1 << endl;
+
+    if (t0 > 0 || t1 > 0)
+    {
+      // cout << "ray " << direction.toString() << " intersected with sphere" << endl;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void raytrace()
 {
   double a = (double)WIDTH / (double)HEIGHT;
-  double t = tan((double)fov / 2);
+  double t = tan(((fov / 180.0) * M_PI) / 2.0);
 
   Point topLeft(-a * t, t, -1);
   Point topRight(a * t, t, -1);
   Point bottomLeft(-a * t, -t, -1);
   Point bottomRight(a * t, -t, -1);
 
+  cout << "topLeft: " << topLeft << endl;
+  cout << "topRight: " << topRight << endl;
+  cout << "bottomLeft: " << bottomLeft << endl;
+  cout << "bottomRight: " << bottomRight << endl;
+
   double width = 2 * a * t;
   double height = 2 * t;
-  double h_step = width / (double)WIDTH;
-  double v_step = height / (double)WIDTH;
+  double x_step = width / (double)WIDTH;
+  double y_step = height / (double)WIDTH;
 
-  Point ray = topLeft;
+  cout << "width:" << width << endl;
+  cout << "height:" << height << endl;
+  cout << "x_step:" << x_step << endl;
+  cout << "y_step:" << y_step << endl;
 
   for (unsigned x = 0; x < WIDTH; x++)
   {
     for (unsigned y = 0; y < HEIGHT; y++)
     {
-      image[y][x]
-      ray.y -= v_step;
+      Point ray = topLeft;
+      ray.x += x * x_step;
+      ray.y -= y * y_step;
+
+      // cout << "Shooting a ray at " << ray << endl;
+      if (intersectSphere(ray))
+      {
+        image[x][y][0] = 1.0;
+        image[x][y][1] = 1.0;
+        image[x][y][2] = 1.0;
+      }
+      else
+      {
+        image[x][y][0] = 0.0;
+        image[x][y][1] = 0.0;
+        image[x][y][2] = 0.0;
+      }
     }
-    ray.x += h_step;
   }
 }
 

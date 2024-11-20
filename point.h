@@ -46,13 +46,23 @@ struct Point
 
   Point &normalize()
   {
-    double magnitude = sqrt((x * x) + (y * y) + (z * z));
-    x /= magnitude;
-    y /= magnitude;
-    z /= magnitude;
+    double m = magnitude();
+    x /= m;
+    y /= m;
+    z /= m;
     return *this;
   }
+
+  double magnitude() const
+  {
+    return sqrt((x * x) + (y * y) + (z * z));
+  }
 };
+
+Point normalize(const Point &p)
+{
+  return Point(p).normalize();
+}
 
 Point crossProduct(const Point &A, const Point &B)
 {
@@ -65,6 +75,12 @@ Point crossProduct(const Point &A, const Point &B)
 Point operator*(const float a, const Point &p)
 {
   return Point(a * p.x, a * p.y, a * p.z);
+}
+
+std::ostream &operator<<(std::ostream &os, const Point &p)
+{
+  os << p.toString();
+  return os;
 }
 
 #endif
