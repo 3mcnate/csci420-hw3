@@ -1,6 +1,7 @@
 #include <sstream>
 #include <string>
 #include <iostream>
+#include "objects.h"
 
 #ifndef POINT_H
 #define POINT_H
@@ -21,6 +22,8 @@ struct Point
     z = point[2];
   }
 
+  Point(const Vertex &v) : x(v.position[0]), y(v.position[1]), z(v.position[2]) {}
+
   string toString() const
   {
     stringstream ss;
@@ -34,14 +37,19 @@ struct Point
     return *this;
   }
 
-  Point operator+(const Point &rhs)
+  Point operator+(const Point &rhs) const
   {
     return Point(x + rhs.x, y + rhs.y, z + rhs.z);
   }
 
-  Point operator-()
+  Point operator-() const
   {
     return Point(-x, -y, -z);
+  }
+
+  Point operator-(const Point &rhs) const
+  {
+    return *this + -rhs;
   }
 
   Point &normalize()
@@ -70,6 +78,11 @@ Point crossProduct(const Point &A, const Point &B)
   double Cy = A.z * B.x - A.x * B.z;
   double Cz = A.x * B.y - A.y * B.x;
   return Point(Cx, Cy, Cz);
+}
+
+double dot(const Point &A, const Point &B)
+{
+  return (A.x * B.x) + (A.y * B.y) + (A.z * B.z);
 }
 
 Point operator*(const float a, const Point &p)

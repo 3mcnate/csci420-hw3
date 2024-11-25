@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <cmath>
+
 float clamp(double x)
 {
   if (x < 0)
@@ -13,6 +15,11 @@ float clamp(double x)
 double sq(double x)
 {
   return x * x;
+}
+
+bool equal(double x, double y)
+{
+  return abs(x - y) < 0.0001;
 }
 
 #endif

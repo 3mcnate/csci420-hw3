@@ -26,8 +26,10 @@
 
 #include <imageIO.h>
 #include <cmath>
+#include <cassert>
 #include "point.h"
 #include "utils.h"
+#include "objects.h"
 
 #define MAX_TRIANGLES 20000
 #define MAX_SPHERES 100
@@ -55,35 +57,6 @@ unsigned char buffer[WIDTH][HEIGHT][3];
 
 // buffer to hold image as we do ray tracing
 float image[WIDTH][HEIGHT][3];
-
-struct Vertex
-{
-  double position[3];
-  double color_diffuse[3];
-  double color_specular[3];
-  double normal[3];
-  double shininess;
-};
-
-struct Triangle
-{
-  Vertex v[3];
-};
-
-struct Sphere
-{
-  double position[3];
-  double color_diffuse[3];
-  double color_specular[3];
-  double shininess;
-  double radius;
-};
-
-struct Light
-{
-  double position[3];
-  double color[3];
-};
 
 Triangle triangles[MAX_TRIANGLES];
 Sphere spheres[MAX_SPHERES];
@@ -287,25 +260,27 @@ void init()
 
   glClearColor(0, 0, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT);
+
+  draw_scene();
 }
 
 void idle()
 {
-  // Hack to make it only draw once.
-  static int once = 0;
-  if (!once)
-  {
-    draw_scene();
-    if (mode == MODE_JPEG)
-      save_jpg();
-  }
-  once = 1;
+  // // Hack to make it only draw once.
+  // static int once = 0;
+  // if (!once)
+  // {
+  //   draw_scene();
+  //   if (mode == MODE_JPEG)
+  //     save_jpg();
+  // }
+  // once = 1;
 }
 
 bool intersectSphere(Point direction)
 {
   direction.normalize();
-  // cout << "direction:" << direction << " magnitude:" << direction.magnitude() << endl;
+  // cout << "shooting ray with direction " << direction << endl;
   for (int i = 0; i < num_spheres; i++)
   {
     double xc = spheres[i].position[0];
@@ -338,7 +313,7 @@ bool intersectSphere(Point direction)
       t1 = (-b + sqrt(determinant)) / 2;
     }
 
-    // cout << "t0:" << t0 << " t1:" << t1 << endl;
+    // cout << "t0: " << t0 << " t1: " << t1 << endl;
 
     if (t0 > 0 || t1 > 0)
     {
@@ -350,30 +325,103 @@ bool intersectSphere(Point direction)
   return false;
 }
 
+void projectTriangleTo2D(Point &A, Point &B, Point &C, Point &intersection)
+{
+  // check if triangle is in YZ plane
+  if (equal(A.x, B.x) && equal(B.x, C.x) && equal(A.x, C.x))
+  {
+    std::swap(A.x, A.z);
+    std::swap(B.x, B.z);
+    std::swap(C.x, C.z);
+    std::swap(intersection.x, intersection.z);
+  }
+
+  // check if triangle is in XZ plane
+  else if (equal(A.y, B.y) && equal(B.y, C.y) && equal(A.y, C.y))
+  {
+    std::swap(A.y, A.z);
+    std::swap(B.y, B.z);
+    std::swap(C.y, C.z);
+    std::swap(intersection.y, intersection.z);
+  }
+
+  // project to 2D
+  A.z = 0;
+  B.z = 0;
+  C.z = 0;
+  intersection.z = 0;
+}
+
+bool checkIntersection(const Point &A, const Point &B, const Point &C, const Point &P)
+{
+  double area_ABC = 0.5 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
+  double area_PBC = 0.5 * (P.x * (B.y - C.y) + B.x * (C.y - P.y) + C.x * (P.y - B.y));
+  double area_PCA = 0.5 * (A.x * (P.y - C.y) + P.x * (C.y - A.y) + C.x * (A.y - P.y));
+  double area_PAB = 0.5 * (A.x * (B.y - P.y) + B.x * (P.y - A.y) + P.x * (A.y - B.y));
+
+  double alpha = area_PBC / area_ABC;
+  double beta = area_PCA / area_ABC;
+  double gamma = area_PAB / area_ABC;
+
+  return 0 <= alpha && alpha <= 1 && 0 <= beta && beta <= 1 && 0 <= gamma && gamma <= 1 && equal(alpha + beta + gamma, 1.0);
+}
+
+bool intersectTriangle(Point direction)
+{
+  direction.normalize();
+  for (unsigned i = 0; i < num_triangles; i++)
+  {
+    Point A(triangles[i].v[0]);
+    Point B(triangles[i].v[1]);
+    Point C(triangles[i].v[2]);
+    Point normal = crossProduct(B - A, C - A).normalize();
+
+    // d = -dot(normal, A), numerator = -d since p0 = (0,0,0)
+    double numerator = dot(normal, A);
+    double denominator = dot(normal, direction);
+
+    if (denominator <= 0)
+      continue;
+
+    double t = numerator / denominator;
+    Point intersection = t * direction;
+
+    // project to 2D - need to be careful
+    projectTriangleTo2D(A, B, C, intersection);
+    if (checkIntersection(A, B, C, intersection))
+      return true;
+  }
+  return false;
+}
+
 void raytrace()
 {
   double a = (double)WIDTH / (double)HEIGHT;
-  double t = tan(((fov / 180.0) * M_PI) / 2.0);
+  double t = tan(fov * M_PI / 360.0);
 
   Point topLeft(-a * t, t, -1);
   Point topRight(a * t, t, -1);
   Point bottomLeft(-a * t, -t, -1);
   Point bottomRight(a * t, -t, -1);
 
-  cout << "topLeft: " << topLeft << endl;
-  cout << "topRight: " << topRight << endl;
-  cout << "bottomLeft: " << bottomLeft << endl;
+  cout << "topLeft:     " << topLeft << endl;
+  cout << "topRight:    " << topRight << endl;
+  cout << "bottomLeft:  " << bottomLeft << endl;
   cout << "bottomRight: " << bottomRight << endl;
+  cout << endl;
 
   double width = 2 * a * t;
   double height = 2 * t;
   double x_step = width / (double)WIDTH;
   double y_step = height / (double)WIDTH;
 
-  cout << "width:" << width << endl;
-  cout << "height:" << height << endl;
-  cout << "x_step:" << x_step << endl;
-  cout << "y_step:" << y_step << endl;
+  cout << "width:  " << width << endl;
+  cout << "height: " << height << endl;
+  cout << "x_step: " << x_step << endl;
+  cout << "y_step: " << y_step << endl;
+
+  // intersectSphere(Point(0,0.1,-1));
+  // return;
 
   for (unsigned x = 0; x < WIDTH; x++)
   {
@@ -383,18 +431,21 @@ void raytrace()
       ray.x += x * x_step;
       ray.y -= y * y_step;
 
+      assert(topLeft.x <= ray.x && ray.x <= bottomRight.x);
+      // assert(topLeft.y >= ray.y && ray.y >= bottomRight.y);
+
       // cout << "Shooting a ray at " << ray << endl;
-      if (intersectSphere(ray))
+      if (intersectSphere(ray) || intersectTriangle(ray))
       {
-        image[x][y][0] = 1.0;
-        image[x][y][1] = 1.0;
-        image[x][y][2] = 1.0;
+        image[x][HEIGHT - y][0] = 1.0;
+        image[x][HEIGHT - y][1] = 1.0;
+        image[x][HEIGHT - y][2] = 1.0;
       }
       else
       {
-        image[x][y][0] = 0.0;
-        image[x][y][1] = 0.0;
-        image[x][y][2] = 0.0;
+        image[x][HEIGHT - y][0] = 0.0;
+        image[x][HEIGHT - y][1] = 0.0;
+        image[x][HEIGHT - y][2] = 0.0;
       }
     }
   }
