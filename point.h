@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include "objects.h"
+#include "utils.h"
 
 #ifndef POINT_H
 #define POINT_H

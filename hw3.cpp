@@ -553,9 +553,9 @@ bool shootShadowRay(Point ray, Point P0, int i)
 }
 
 /*
- * Shoots out a ray originating at P0
+ * Shoots out a ray originating at P0. Returns final color
  */
-void shootRay(Point ray, Point P0)
+Point shootRay(Point ray, Point P0)
 {
 
   Intersection closest = findClosestIntersection(ray, P0);
@@ -609,9 +609,8 @@ void shootRay(Point ray, Point P0)
         color = color + computePhongIllumination(Point(light.color), kd, L, N, ks, R, V, sh);
       }
     }
-
   }
-  
+
   color.clampValues();
   return color;
 }
@@ -656,7 +655,10 @@ void raytrace()
       // assert(topLeft.y >= ray.y && ray.y >= bottomRight.y);
 
       // shoot ray
-      shootRay(ray, camera);
+      Point finalColor = shootRay(ray, camera);
+      image[x][HEIGHT - y][0] = finalColor.x;
+      image[x][HEIGHT - y][1] = finalColor.y;
+      image[x][HEIGHT - y][2] = finalColor.z;
     }
   }
 }
