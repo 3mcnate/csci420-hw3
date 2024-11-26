@@ -27,6 +27,9 @@
 #include <imageIO.h>
 #include <cmath>
 #include <cassert>
+#include <limits>
+#include <algorithm>
+
 #include "point.h"
 #include "utils.h"
 #include "objects.h"
@@ -47,7 +50,7 @@ int mode = MODE_DISPLAY;
 // The still images that you need to submit with the homework should be at the below resolution (640x480).
 // However, for your own purposes, after you have solved the homework, you can increase those values to obtain higher-resolution images.
 #define WIDTH 320
-#define HEIGHT 240
+#define HEIGHT 320
 
 // The field of view of the camera, in degrees.
 #define fov 60.0
@@ -63,11 +66,48 @@ Sphere spheres[MAX_SPHERES];
 Light lights[MAX_LIGHTS];
 double ambient_light[3];
 
+Point camera(0, 0, 0);
+
 int num_triangles = 0;
 int num_spheres = 0;
 int num_lights = 0;
 
 unsigned long counter = 0;
+
+typedef enum ObjectType
+{
+  SPHERE,
+  TRIANGLE,
+  LIGHT,
+  NONE
+};
+
+struct Intersection
+{
+  double t;
+  int i;
+  Point b_coords;
+  ObjectType type;
+
+  Intersection(double t, int i, Point b, ObjectType type) : t(t), i(i), b_coords(b), type(type) {}
+
+  bool operator==(const Intersection &rhs)
+  {
+    return t == rhs.t && i == rhs.i && b_coords == rhs.b_coords && type == rhs.type;
+  }
+
+  bool operator!=(const Intersection &other)
+  {
+    return !(*this == other);
+  }
+
+  bool isValid()
+  {
+    return type != NONE;
+  }
+};
+
+const Intersection invalidIntersection(-1, -1, Point::invalidPoint(), NONE);
 
 void plot_pixel_display(int x, int y, unsigned char r, unsigned char g, unsigned char b);
 void plot_pixel_jpeg(int x, int y, unsigned char r, unsigned char g, unsigned char b);
@@ -261,7 +301,10 @@ void init()
   glClearColor(0, 0, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT);
 
+  // much faster if done here
   draw_scene();
+  if (mode == MODE_JPEG)
+    save_jpg();
 }
 
 void idle()
@@ -277,52 +320,63 @@ void idle()
   // once = 1;
 }
 
-bool intersectSphere(Point direction)
+Intersection intersectSphere(Point direction, Point P0, int i)
 {
-  direction.normalize();
   // cout << "shooting ray with direction " << direction << endl;
-  for (int i = 0; i < num_spheres; i++)
+
+  double xc = spheres[i].position[0];
+  double yc = spheres[i].position[1];
+  double zc = spheres[i].position[2];
+  double r = spheres[i].radius;
+
+  double xd = direction.x;
+  double yd = direction.y;
+  double zd = direction.z;
+
+  double x0 = P0.x;
+  double y0 = P0.y;
+  double z0 = P0.z;
+
+  // x0, y0, z0 = 0
+  double b = 2 * (xd * (x0 - xc) + yd * (y0 - yc) + zd * (z0 - zc));
+  double c = sq(x0 - xc) + sq(y0 - yc) + sq(z0 - zc) - sq(r);
+
+  double determinant = (b * b) - 4 * c;
+
+  // no real solutions
+  if (determinant < 0)
+    return invalidIntersection;
+
+  double t0, t1;
+  if (determinant == 0)
   {
-    double xc = spheres[i].position[0];
-    double yc = spheres[i].position[1];
-    double zc = spheres[i].position[2];
-    double r = spheres[i].radius;
-
-    double xd = direction.x;
-    double yd = direction.y;
-    double zd = direction.z;
-
-    // x0, y0, z0 = 0
-    double b = 2 * ((xd * -xc) + (yd * -yc) + (zd * -zc));
-    double c = sq(xc) + sq(yc) + sq(zc) - sq(r);
-
-    double determinant = (b * b) - 4 * c;
-
-    // no real solutions
-    if (determinant < 0)
-      continue;
-
-    double t0, t1;
-    if (determinant == 0)
-    {
-      t0 = t1 = -b / 2;
-    }
-    else
-    {
-      t0 = (-b - sqrt(determinant)) / 2;
-      t1 = (-b + sqrt(determinant)) / 2;
-    }
-
-    // cout << "t0: " << t0 << " t1: " << t1 << endl;
-
-    if (t0 > 0 || t1 > 0)
-    {
-      // cout << "ray " << direction.toString() << " intersected with sphere" << endl;
-      return true;
-    }
+    t0 = t1 = -b / 2;
+  }
+  else
+  {
+    t0 = (-b - sqrt(determinant)) / 2;
+    t1 = (-b + sqrt(determinant)) / 2;
   }
 
-  return false;
+  double t;
+  if (t0 > 0 && t1 > 0)
+  {
+    t = min(t0, t1);
+  }
+  else if (t0 > 0)
+  {
+    t = t0;
+  }
+  else if (t1 > 0)
+  {
+    t = t1;
+  }
+  else
+  {
+    return invalidIntersection;
+  }
+
+  return Intersection(t, i, Point::invalidPoint(), SPHERE);
 }
 
 void projectTriangleTo2D(Point &A, Point &B, Point &C, Point &intersection)
@@ -352,7 +406,7 @@ void projectTriangleTo2D(Point &A, Point &B, Point &C, Point &intersection)
   intersection.z = 0;
 }
 
-bool checkIntersection(const Point &A, const Point &B, const Point &C, const Point &P)
+Point computeBarycentricCoords(const Point &A, const Point &B, const Point &C, const Point &P)
 {
   double area_ABC = 0.5 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
   double area_PBC = 0.5 * (P.x * (B.y - C.y) + B.x * (C.y - P.y) + C.x * (P.y - B.y));
@@ -363,35 +417,203 @@ bool checkIntersection(const Point &A, const Point &B, const Point &C, const Poi
   double beta = area_PCA / area_ABC;
   double gamma = area_PAB / area_ABC;
 
-  return 0 <= alpha && alpha <= 1 && 0 <= beta && beta <= 1 && 0 <= gamma && gamma <= 1 && equal(alpha + beta + gamma, 1.0);
+  return Point(alpha, beta, gamma);
 }
 
-bool intersectTriangle(Point direction)
+bool checkForIntersection(const Point &c)
 {
-  direction.normalize();
-  for (unsigned i = 0; i < num_triangles; i++)
+  return isNormalized(c.x) && isNormalized(c.y) && isNormalized(c.z) && equal(c.x + c.y + c.z, 1.0);
+}
+
+Intersection intersectTriangle(Point direction, Point P0, int i)
+{
+
+  Point A(triangles[i].v[0]);
+  Point B(triangles[i].v[1]);
+  Point C(triangles[i].v[2]);
+  Point normal = crossProduct(B - A, C - A).normalize();
+
+  double d = -dot(normal, A);
+  double numerator = -(dot(normal, P0) + d);
+  double denominator = dot(normal, direction);
+
+  if (denominator <= 0)
+    return invalidIntersection;
+
+  double t = numerator / denominator;
+  Point intersectionPoint = P0 + t * direction;
+
+  // project to 2D - need to be careful
+  projectTriangleTo2D(A, B, C, intersectionPoint);
+  Point bary_coords = computeBarycentricCoords(A, B, C, intersectionPoint);
+
+  if (checkForIntersection(bary_coords))
+    return {t, i, bary_coords, TRIANGLE};
+  else
+    return invalidIntersection;
+}
+
+Point computePhongTriangleNormal(Point b_coords, int triangle_idx)
+{
+  Triangle triangle = triangles[triangle_idx];
+  Point N1(triangle.v[0].normal);
+  Point N2(triangle.v[1].normal);
+  Point N3(triangle.v[2].normal);
+  return (b_coords.x * N1 + b_coords.y * N2 + b_coords.z * N3).normalize();
+}
+
+Point computePhongKd(Point b_coords, int triangle_idx)
+{
+  Triangle triangle = triangles[triangle_idx];
+  Point kd1(triangle.v[0].color_diffuse);
+  Point kd2(triangle.v[1].color_diffuse);
+  Point kd3(triangle.v[2].color_diffuse);
+  return (b_coords.x * kd1 + b_coords.y * kd2 + b_coords.z * kd3).normalize();
+}
+
+Point computePhongKs(Point b_coords, int triangle_idx)
+{
+  Triangle triangle = triangles[triangle_idx];
+  Point ks1(triangle.v[0].color_specular);
+  Point ks2(triangle.v[1].color_specular);
+  Point ks3(triangle.v[2].color_specular);
+  return (b_coords.x * ks1 + b_coords.y * ks2 + b_coords.z * ks3).normalize();
+}
+
+double computePhongSh(Point b_coords, int triangle_idx)
+{
+  Triangle triangle = triangles[triangle_idx];
+  double sh1 = triangle.v[0].shininess;
+  double sh2 = triangle.v[1].shininess;
+  double sh3 = triangle.v[2].shininess;
+  return dot(b_coords, Point(sh1, sh2, sh3));
+}
+
+Point computePhongIllumination(Point lightColor, Point kd, Point L, Point N, Point ks, Point R, Point V, double sh)
+{
+  double LdotN = dot(L, N);
+  double RdotV = dot(R, V);
+  if (LdotN < 0)
+    LdotN = 0;
+  if (RdotV < 0)
+    RdotV = 0;
+
+  double r = lightColor.x * (kd.x * LdotN + ks.x * pow(ks.x * RdotV, sh));
+  double g = lightColor.y * (kd.y * LdotN + ks.y * pow(ks.y * RdotV, sh));
+  double b = lightColor.z * (kd.z * LdotN + ks.z * pow(ks.z * RdotV, sh));
+
+  return Point(r, g, b);
+}
+
+Intersection findClosestIntersection(Point ray, Point P0)
+{
+  ray.normalize();
+
+  Intersection closest = {std::numeric_limits<double>::max(),
+                          -1,
+                          Point::invalidPoint(),
+                          NONE};
+
+  // calculate intersections with triangles
+  for (int i = 0; i < num_triangles; i++)
   {
-    Point A(triangles[i].v[0]);
-    Point B(triangles[i].v[1]);
-    Point C(triangles[i].v[2]);
-    Point normal = crossProduct(B - A, C - A).normalize();
-
-    // d = -dot(normal, A), numerator = -d since p0 = (0,0,0)
-    double numerator = dot(normal, A);
-    double denominator = dot(normal, direction);
-
-    if (denominator <= 0)
-      continue;
-
-    double t = numerator / denominator;
-    Point intersection = t * direction;
-
-    // project to 2D - need to be careful
-    projectTriangleTo2D(A, B, C, intersection);
-    if (checkIntersection(A, B, C, intersection))
-      return true;
+    Intersection curr = intersectTriangle(ray, P0, i);
+    if (curr.isValid() && curr.t < closest.t)
+    {
+      closest = curr;
+    }
   }
-  return false;
+
+  // compute intersections with spheres
+  for (int i = 0; i < num_spheres; i++)
+  {
+    Intersection curr = intersectSphere(ray, P0, i);
+    if (curr.isValid() && curr.t < closest.t)
+    {
+      closest = curr;
+    }
+  }
+
+  return closest;
+}
+
+// returns false if shadow ray is blocked, true otherwise
+bool shootShadowRay(Point ray, Point P0, int i)
+{
+  Point light(lights[i].position);
+  double t_max = (light.x - P0.x) / ray.x;
+  Intersection closest = findClosestIntersection(ray, P0);
+
+  // if no intersection, the shadow ray is not blocked
+  if (!closest.isValid())
+    return true;
+
+  // if there is an intersection, check if it's greater than t_max
+  return closest.t > t_max;
+}
+
+/*
+ * Shoots out a ray originating at P0
+ */
+void shootRay(Point ray, Point P0)
+{
+
+  Intersection closest = findClosestIntersection(ray, P0);
+
+  Point color(ambient_light);
+
+  // no intersection
+  if (closest.type == NONE)
+  {
+    // color = background
+    color = Point(137.0 / 255.0, 246.0 / 255.0, 250.0 / 255.0);
+  }
+  else
+  {
+    Point intersection = P0 + closest.t * ray;
+
+    // shoot shadow ray to each light source and add up contributions
+    for (int i = 0; i < num_lights; i++)
+    {
+      Light light = lights[i];
+      Point shadowRay = (Point(light.position) - intersection).normalize();
+
+      // shadow ray not blocked
+      if (shootShadowRay(shadowRay, intersection, i))
+      {
+        // compute phong lighting for each color channel
+        Point N;
+        Point kd;
+        Point ks;
+        double sh;
+        if (closest.type == TRIANGLE)
+        {
+          N = computePhongTriangleNormal(closest.b_coords, closest.i);
+          kd = computePhongKd(closest.b_coords, closest.i);
+          ks = computePhongKs(closest.b_coords, closest.i);
+          sh = computePhongSh(closest.b_coords, closest.i);
+        }
+        else
+        {
+          N = (intersection - Point(spheres[closest.i].position)).normalize();
+          kd = Point(spheres[closest.i].color_diffuse);
+          ks = Point(spheres[closest.i].color_specular);
+          sh = spheres[closest.i].shininess;
+        }
+
+        Point L = shadowRay;
+        Point V = (camera - intersection).normalize();
+        Point R = 2 * dot(L, N) * N - L;
+
+        // compute r contribution
+        color = color + computePhongIllumination(Point(light.color), kd, L, N, ks, R, V, sh);
+      }
+    }
+
+  }
+  
+  color.clampValues();
+  return color;
 }
 
 void raytrace()
@@ -431,22 +653,10 @@ void raytrace()
       ray.x += x * x_step;
       ray.y -= y * y_step;
 
-      assert(topLeft.x <= ray.x && ray.x <= bottomRight.x);
       // assert(topLeft.y >= ray.y && ray.y >= bottomRight.y);
 
-      // cout << "Shooting a ray at " << ray << endl;
-      if (intersectSphere(ray) || intersectTriangle(ray))
-      {
-        image[x][HEIGHT - y][0] = 1.0;
-        image[x][HEIGHT - y][1] = 1.0;
-        image[x][HEIGHT - y][2] = 1.0;
-      }
-      else
-      {
-        image[x][HEIGHT - y][0] = 0.0;
-        image[x][HEIGHT - y][1] = 0.0;
-        image[x][HEIGHT - y][2] = 0.0;
-      }
+      // shoot ray
+      shootRay(ray, camera);
     }
   }
 }

@@ -1,0 +1,4 @@
+l = unit vector to light source
+n = surface normal
+v = unit vector to viewer
+r = reflection of l at p, r = 2 (l dot n)n - l

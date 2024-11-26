@@ -1,6 +1,7 @@
 #include <sstream>
 #include <string>
 #include <iostream>
+#include <stdexcept>
 #include "objects.h"
 
 #ifndef POINT_H
@@ -13,19 +14,17 @@ struct Point
 {
   double x, y, z;
 
-  Point(double x, double y, double z) : x(x), y(y), z(z) {}
+  Point() : valid(false) {}
 
-  Point(double *point)
-  {
-    x = point[0];
-    y = point[1];
-    z = point[2];
-  }
+  Point(double x, double y, double z) : x(x), y(y), z(z), valid(true) {}
 
-  Point(const Vertex &v) : x(v.position[0]), y(v.position[1]), z(v.position[2]) {}
+  Point(double *point) : x(point[0]), y(point[1]), z(point[2]), valid(true) {}
+
+  Point(const Vertex &v) : x(v.position[0]), y(v.position[1]), z(v.position[2]), valid(true) {}
 
   string toString() const
   {
+    checkIfValid();
     stringstream ss;
     ss << "(" << x << ", " << y << ", " << z << ")";
     return ss.str();
@@ -33,27 +32,38 @@ struct Point
 
   Point &print()
   {
+    checkIfValid();
     cout << toString() << endl;
     return *this;
   }
 
   Point operator+(const Point &rhs) const
   {
+    checkIfValid();
     return Point(x + rhs.x, y + rhs.y, z + rhs.z);
   }
 
   Point operator-() const
   {
+    checkIfValid();
     return Point(-x, -y, -z);
   }
 
   Point operator-(const Point &rhs) const
   {
+    checkIfValid();
     return *this + -rhs;
+  }
+
+  bool operator==(const Point &other) const
+  {
+    checkIfValid();
+    return x == other.x && y == other.y && z == other.z && valid == other.valid;
   }
 
   Point &normalize()
   {
+    checkIfValid();
     double m = magnitude();
     x /= m;
     y /= m;
@@ -61,9 +71,37 @@ struct Point
     return *this;
   }
 
+  Point& clampValues()
+  {
+    x = clamp(x);
+    y = clamp(y);
+    z = clamp(z);
+  }
+
   double magnitude() const
   {
+    checkIfValid();
     return sqrt((x * x) + (y * y) + (z * z));
+  }
+
+  bool isValid() const
+  {
+    return valid;
+  }
+
+  static Point invalidPoint()
+  {
+    Point p(0, 0, 0);
+    p.valid = false;
+    return p;
+  }
+
+private:
+  bool valid;
+  void checkIfValid() const
+  {
+    if (!valid)
+      throw std::invalid_argument("Point is invalid");
   }
 };
 

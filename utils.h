@@ -22,4 +22,9 @@ bool equal(double x, double y)
   return abs(x - y) < 0.0001;
 }
 
+bool isNormalized(double x)
+{
+  return 0 <= x && x <= 1;
+}
+
 #endif
