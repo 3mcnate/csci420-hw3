@@ -24,7 +24,7 @@ bool equal(double x, double y)
 
 bool isNormalized(double x)
 {
-  return 0 <= x && x <= 1;
+  return -0.000001 < x && x < 1.0000001;
 }
 
 #endif

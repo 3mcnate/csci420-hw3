@@ -49,8 +49,8 @@ int mode = MODE_DISPLAY;
 // While solving the homework, it is useful to make the below values smaller for debugging purposes.
 // The still images that you need to submit with the homework should be at the below resolution (640x480).
 // However, for your own purposes, after you have solved the homework, you can increase those values to obtain higher-resolution images.
-#define WIDTH 320
-#define HEIGHT 320
+#define WIDTH 640
+#define HEIGHT 480
 
 // The field of view of the camera, in degrees.
 #define fov 60.0
@@ -67,6 +67,7 @@ Light lights[MAX_LIGHTS];
 double ambient_light[3];
 
 Point camera(0, 0, 0);
+Point background = Point(255, 255, 255).convert8BitToFloat();
 
 int num_triangles = 0;
 int num_spheres = 0;
@@ -80,7 +81,7 @@ typedef enum ObjectType
   TRIANGLE,
   LIGHT,
   NONE
-};
+} ObjectType;
 
 struct Intersection
 {
@@ -104,6 +105,28 @@ struct Intersection
   bool isValid()
   {
     return type != NONE;
+  }
+
+  string toString()
+  {
+    stringstream ss;
+    ss << "t=" << t << " i=" << i << " b_coords=" << b_coords.toString() << " type=";
+    switch (type)
+    {
+    case SPHERE:
+      ss << "SPHERE";
+      break;
+    case TRIANGLE:
+      ss << "TRIANGLE";
+      break;
+    case LIGHT:
+      ss << "LIGHT";
+      break;
+    case NONE:
+      ss << "NONE";
+      break;
+    }
+    return ss.str();
   }
 };
 
@@ -322,11 +345,12 @@ void idle()
 
 Intersection intersectSphere(Point direction, Point P0, int i)
 {
-  // cout << "shooting ray with direction " << direction << endl;
-
   double xc = spheres[i].position[0];
   double yc = spheres[i].position[1];
   double zc = spheres[i].position[2];
+  
+  Point C(spheres[i].position);
+
   double r = spheres[i].radius;
 
   double xd = direction.x;
@@ -337,11 +361,10 @@ Intersection intersectSphere(Point direction, Point P0, int i)
   double y0 = P0.y;
   double z0 = P0.z;
 
-  // x0, y0, z0 = 0
   double b = 2 * (xd * (x0 - xc) + yd * (y0 - yc) + zd * (z0 - zc));
   double c = sq(x0 - xc) + sq(y0 - yc) + sq(z0 - zc) - sq(r);
 
-  double determinant = (b * b) - 4 * c;
+  double determinant = sq(b) - 4 * c;
 
   // no real solutions
   if (determinant < 0)
@@ -376,7 +399,7 @@ Intersection intersectSphere(Point direction, Point P0, int i)
     return invalidIntersection;
   }
 
-  return Intersection(t, i, Point::invalidPoint(), SPHERE);
+  return Intersection(t, i, Point(), SPHERE);
 }
 
 void projectTriangleTo2D(Point &A, Point &B, Point &C, Point &intersection)
@@ -441,6 +464,10 @@ Intersection intersectTriangle(Point direction, Point P0, int i)
     return invalidIntersection;
 
   double t = numerator / denominator;
+
+  if (t < 0)
+    return invalidIntersection;
+
   Point intersectionPoint = P0 + t * direction;
 
   // project to 2D - need to be careful
@@ -537,7 +564,7 @@ Intersection findClosestIntersection(Point ray, Point P0)
   return closest;
 }
 
-// returns false if shadow ray is blocked, true otherwise
+// returns true if ray is unobstructed, false if blocked
 bool shootShadowRay(Point ray, Point P0, int i)
 {
   Point light(lights[i].position);
@@ -549,6 +576,8 @@ bool shootShadowRay(Point ray, Point P0, int i)
     return true;
 
   // if there is an intersection, check if it's greater than t_max
+  //  if it's greater than t_max, the intersection occurs above/past
+  //  the light, so the ray is unobstructed to the light and we return true.
   return closest.t > t_max;
 }
 
@@ -565,8 +594,7 @@ Point shootRay(Point ray, Point P0)
   // no intersection
   if (closest.type == NONE)
   {
-    // color = background
-    color = Point(137.0 / 255.0, 246.0 / 255.0, 250.0 / 255.0);
+    color = background;
   }
   else
   {
@@ -634,7 +662,7 @@ void raytrace()
   double width = 2 * a * t;
   double height = 2 * t;
   double x_step = width / (double)WIDTH;
-  double y_step = height / (double)WIDTH;
+  double y_step = height / (double)HEIGHT;
 
   cout << "width:  " << width << endl;
   cout << "height: " << height << endl;
@@ -681,7 +709,14 @@ int main(int argc, char **argv)
   glutInit(&argc, argv);
   loadScene(argv[1]);
 
-  raytrace();
+  try
+  {
+    raytrace();
+  }
+  catch (std::exception& e)
+  {
+    cout << e.what() << endl;
+  }
 
   glutInitDisplayMode(GLUT_RGBA | GLUT_SINGLE);
   glutInitWindowPosition(0, 0);

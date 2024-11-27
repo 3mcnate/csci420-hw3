@@ -25,7 +25,10 @@ struct Point
 
   string toString() const
   {
-    checkIfValid();
+    if (!valid)
+    {
+      return "Invalid point";
+    }
     stringstream ss;
     ss << "(" << x << ", " << y << ", " << z << ")";
     return ss.str();
@@ -33,7 +36,6 @@ struct Point
 
   Point &print()
   {
-    checkIfValid();
     cout << toString() << endl;
     return *this;
   }
@@ -74,9 +76,19 @@ struct Point
 
   Point& clampValues()
   {
+    checkIfValid();
     x = clamp(x);
     y = clamp(y);
     z = clamp(z);
+    return *this;
+  }
+
+  Point& convert8BitToFloat()
+  {
+    x /= 255.0;
+    y /= 255.0;
+    z /= 255.0;
+    return *this;
   }
 
   double magnitude() const
