@@ -345,25 +345,11 @@ void idle()
 
 Intersection intersectSphere(Point direction, Point P0, int i)
 {
-  double xc = spheres[i].position[0];
-  double yc = spheres[i].position[1];
-  double zc = spheres[i].position[2];
-  
   Point C(spheres[i].position);
-
   double r = spheres[i].radius;
 
-  double xd = direction.x;
-  double yd = direction.y;
-  double zd = direction.z;
-
-  double x0 = P0.x;
-  double y0 = P0.y;
-  double z0 = P0.z;
-
-  double b = 2 * (xd * (x0 - xc) + yd * (y0 - yc) + zd * (z0 - zc));
-  double c = sq(x0 - xc) + sq(y0 - yc) + sq(z0 - zc) - sq(r);
-
+  double b = 2 * dot(direction, P0 - C);
+  double c = sq(P0.x - C.x) + sq(P0.y - C.y) + sq(P0.z - C.z) - sq(r);
   double determinant = sq(b) - 4 * c;
 
   // no real solutions
@@ -404,6 +390,8 @@ Intersection intersectSphere(Point direction, Point P0, int i)
 
 void projectTriangleTo2D(Point &A, Point &B, Point &C, Point &intersection)
 {
+  Point normal = crossProduct(B - A, C - A);
+  
   // check if triangle is in YZ plane
   if (equal(A.x, B.x) && equal(B.x, C.x) && equal(A.x, C.x))
   {
@@ -426,15 +414,15 @@ void projectTriangleTo2D(Point &A, Point &B, Point &C, Point &intersection)
   A.z = 0;
   B.z = 0;
   C.z = 0;
-  intersection.z = 0;
+  intersection.z = 0; 
 }
 
 Point computeBarycentricCoords(const Point &A, const Point &B, const Point &C, const Point &P)
 {
-  double area_ABC = 0.5 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
-  double area_PBC = 0.5 * (P.x * (B.y - C.y) + B.x * (C.y - P.y) + C.x * (P.y - B.y));
-  double area_PCA = 0.5 * (A.x * (P.y - C.y) + P.x * (C.y - A.y) + C.x * (A.y - P.y));
-  double area_PAB = 0.5 * (A.x * (B.y - P.y) + B.x * (P.y - A.y) + P.x * (A.y - B.y));
+  double area_ABC = (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
+  double area_PBC = (P.x * (B.y - C.y) + B.x * (C.y - P.y) + C.x * (P.y - B.y));
+  double area_PCA = (A.x * (P.y - C.y) + P.x * (C.y - A.y) + C.x * (A.y - P.y));
+  double area_PAB = (A.x * (B.y - P.y) + B.x * (P.y - A.y) + P.x * (A.y - B.y));
 
   double alpha = area_PBC / area_ABC;
   double beta = area_PCA / area_ABC;
@@ -586,7 +574,6 @@ bool shootShadowRay(Point ray, Point P0, int i)
  */
 Point shootRay(Point ray, Point P0)
 {
-
   Intersection closest = findClosestIntersection(ray, P0);
 
   Point color(ambient_light);
@@ -679,10 +666,11 @@ void raytrace()
       Point ray = topLeft;
       ray.x += x * x_step;
       ray.y -= y * y_step;
+      ray.normalize();
 
       // assert(topLeft.y >= ray.y && ray.y >= bottomRight.y);
-
       // shoot ray
+
       Point finalColor = shootRay(ray, camera);
       image[x][HEIGHT - y][0] = finalColor.x;
       image[x][HEIGHT - y][1] = finalColor.y;
@@ -713,7 +701,7 @@ int main(int argc, char **argv)
   {
     raytrace();
   }
-  catch (std::exception& e)
+  catch (std::exception &e)
   {
     cout << e.what() << endl;
   }

@@ -19,12 +19,12 @@ double sq(double x)
 
 bool equal(double x, double y)
 {
-  return abs(x - y) < 0.0001;
+  return abs(x - y) < 1e-10;
 }
 
 bool isNormalized(double x)
 {
-  return -0.000001 < x && x < 1.0000001;
+  return 0 <= x && x <= 1;
 }
 
 #endif
