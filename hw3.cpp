@@ -49,8 +49,8 @@ int mode = MODE_DISPLAY;
 // While solving the homework, it is useful to make the below values smaller for debugging purposes.
 // The still images that you need to submit with the homework should be at the below resolution (640x480).
 // However, for your own purposes, after you have solved the homework, you can increase those values to obtain higher-resolution images.
-#define WIDTH 640
-#define HEIGHT 480
+#define WIDTH 320
+#define HEIGHT 240
 
 // The field of view of the camera, in degrees.
 #define fov 60.0
@@ -343,8 +343,10 @@ void idle()
   // once = 1;
 }
 
-Intersection intersectSphere(Point direction, Point P0, int i)
+Intersection intersectSphere(Point direction, Point P0, int i, bool shadowRay)
 {
+  direction.normalize();
+
   Point C(spheres[i].position);
   double r = spheres[i].radius;
 
@@ -363,8 +365,9 @@ Intersection intersectSphere(Point direction, Point P0, int i)
   }
   else
   {
-    t0 = (-b - sqrt(determinant)) / 2;
-    t1 = (-b + sqrt(determinant)) / 2;
+    double sqrtDet = sqrt(determinant);
+    t0 = (-b - sqrtDet) / 2;
+    t1 = (-b + sqrtDet) / 2;
   }
 
   double t;
@@ -390,31 +393,58 @@ Intersection intersectSphere(Point direction, Point P0, int i)
 
 void projectTriangleTo2D(Point &A, Point &B, Point &C, Point &intersection)
 {
+
+  // Compute triangle normal
   Point normal = crossProduct(B - A, C - A);
-  
-  // check if triangle is in YZ plane
-  if (equal(A.x, B.x) && equal(B.x, C.x) && equal(A.x, C.x))
+
+  // Determine dominant axis of the normal
+  if (abs(normal.x) >= abs(normal.y) && abs(normal.x) >= abs(normal.z))
   {
+    // Project to YZ plane (discard x)
     std::swap(A.x, A.z);
     std::swap(B.x, B.z);
     std::swap(C.x, C.z);
     std::swap(intersection.x, intersection.z);
   }
-
-  // check if triangle is in XZ plane
-  else if (equal(A.y, B.y) && equal(B.y, C.y) && equal(A.y, C.y))
+  else if (abs(normal.y) >= abs(normal.x) && abs(normal.y) >= abs(normal.z))
   {
+    // Project to XZ plane (discard y)
     std::swap(A.y, A.z);
     std::swap(B.y, B.z);
     std::swap(C.y, C.z);
     std::swap(intersection.y, intersection.z);
   }
+  // Default: Project to XY plane (discard z)
 
-  // project to 2D
-  A.z = 0;
-  B.z = 0;
-  C.z = 0;
-  intersection.z = 0; 
+  // Check for degeneracy after projection
+  if ((A.x == B.x && A.y == B.y) || (B.x == C.x && B.y == C.y) || (C.x == A.x && C.y == A.y))
+  {
+    throw std::runtime_error("Degenerate triangle after projection");
+  }
+
+  // // check if triangle is in YZ plane
+  // if (equal(A.x, B.x) && equal(B.x, C.x) && equal(A.x, C.x))
+  // {
+  //   std::swap(A.x, A.z);
+  //   std::swap(B.x, B.z);
+  //   std::swap(C.x, C.z);
+  //   std::swap(intersection.x, intersection.z);
+  // }
+
+  // // check if triangle is in XZ plane
+  // else if (equal(A.y, B.y) && equal(B.y, C.y) && equal(A.y, C.y))
+  // {
+  //   std::swap(A.y, A.z);
+  //   std::swap(B.y, B.z);
+  //   std::swap(C.y, C.z);
+  //   std::swap(intersection.y, intersection.z);
+  // }
+
+  // // project to 2D
+  // A.z = 0;
+  // B.z = 0;
+  // C.z = 0;
+  // intersection.z = 0;
 }
 
 Point computeBarycentricCoords(const Point &A, const Point &B, const Point &C, const Point &P)
@@ -436,9 +466,8 @@ bool checkForIntersection(const Point &c)
   return isNormalized(c.x) && isNormalized(c.y) && isNormalized(c.z) && equal(c.x + c.y + c.z, 1.0);
 }
 
-Intersection intersectTriangle(Point direction, Point P0, int i)
+Intersection intersectTriangle(Point direction, Point P0, int i, bool shadowRay)
 {
-
   Point A(triangles[i].v[0]);
   Point B(triangles[i].v[1]);
   Point C(triangles[i].v[2]);
@@ -448,17 +477,17 @@ Intersection intersectTriangle(Point direction, Point P0, int i)
   double numerator = -(dot(normal, P0) + d);
   double denominator = dot(normal, direction);
 
-  if (denominator <= 0)
+  if (equal(denominator, 0))
     return invalidIntersection;
 
   double t = numerator / denominator;
 
-  if (t < 0)
+  // t <= 0
+  if (t < 1e-10)
     return invalidIntersection;
 
   Point intersectionPoint = P0 + t * direction;
 
-  // project to 2D - need to be careful
   projectTriangleTo2D(A, B, C, intersectionPoint);
   Point bary_coords = computeBarycentricCoords(A, B, C, intersectionPoint);
 
@@ -520,19 +549,19 @@ Point computePhongIllumination(Point lightColor, Point kd, Point L, Point N, Poi
   return Point(r, g, b);
 }
 
-Intersection findClosestIntersection(Point ray, Point P0)
+Intersection findClosestIntersection(Point ray, Point P0, bool shadowRay)
 {
   ray.normalize();
 
-  Intersection closest = {std::numeric_limits<double>::max(),
-                          -1,
-                          Point::invalidPoint(),
-                          NONE};
+  Intersection closest(std::numeric_limits<double>::max(),
+                       -1,
+                       Point::invalidPoint(),
+                       NONE);
 
   // calculate intersections with triangles
   for (int i = 0; i < num_triangles; i++)
   {
-    Intersection curr = intersectTriangle(ray, P0, i);
+    Intersection curr = intersectTriangle(ray, P0, i, shadowRay);
     if (curr.isValid() && curr.t < closest.t)
     {
       closest = curr;
@@ -542,7 +571,7 @@ Intersection findClosestIntersection(Point ray, Point P0)
   // compute intersections with spheres
   for (int i = 0; i < num_spheres; i++)
   {
-    Intersection curr = intersectSphere(ray, P0, i);
+    Intersection curr = intersectSphere(ray, P0, i, shadowRay);
     if (curr.isValid() && curr.t < closest.t)
     {
       closest = curr;
@@ -557,7 +586,7 @@ bool shootShadowRay(Point ray, Point P0, int i)
 {
   Point light(lights[i].position);
   double t_max = (light.x - P0.x) / ray.x;
-  Intersection closest = findClosestIntersection(ray, P0);
+  Intersection closest = findClosestIntersection(ray, P0, true);
 
   // if no intersection, the shadow ray is not blocked
   if (!closest.isValid())
@@ -574,7 +603,7 @@ bool shootShadowRay(Point ray, Point P0, int i)
  */
 Point shootRay(Point ray, Point P0)
 {
-  Intersection closest = findClosestIntersection(ray, P0);
+  Intersection closest = findClosestIntersection(ray, P0, false);
 
   Point color(ambient_light);
 
@@ -636,15 +665,6 @@ void raytrace()
   double t = tan(fov * M_PI / 360.0);
 
   Point topLeft(-a * t, t, -1);
-  Point topRight(a * t, t, -1);
-  Point bottomLeft(-a * t, -t, -1);
-  Point bottomRight(a * t, -t, -1);
-
-  cout << "topLeft:     " << topLeft << endl;
-  cout << "topRight:    " << topRight << endl;
-  cout << "bottomLeft:  " << bottomLeft << endl;
-  cout << "bottomRight: " << bottomRight << endl;
-  cout << endl;
 
   double width = 2 * a * t;
   double height = 2 * t;
@@ -655,21 +675,41 @@ void raytrace()
   cout << "height: " << height << endl;
   cout << "x_step: " << x_step << endl;
   cout << "y_step: " << y_step << endl;
+  cout << endl;
 
-  // intersectSphere(Point(0,0.1,-1));
-  // return;
+  cout << "num_triangles: " << num_triangles << endl;
+  cout << "num_spheres:   " << num_spheres << endl;
+  cout << "num_lights:    " << num_lights << endl;
+  cout << endl;
+
+  /**
+   * DEBUGGING
+   */
 
   for (unsigned x = 0; x < WIDTH; x++)
   {
     for (unsigned y = 0; y < HEIGHT; y++)
     {
+      image[x][HEIGHT - y][0] = 1;
+      image[x][HEIGHT - y][1] = 1;
+      image[x][HEIGHT - y][2] = 1;
+    }
+  }
+
+  int x_start = 0;
+  int x_end = WIDTH;
+  int y_start = 0;
+  int y_end = HEIGHT;
+
+  for (unsigned x = x_start; x < x_end; x++)
+  {
+    for (unsigned y = y_start; y < y_end; y++)
+    {
+      // cout << "x: " << x << " y: " << y << endl;
       Point ray = topLeft;
       ray.x += x * x_step;
       ray.y -= y * y_step;
       ray.normalize();
-
-      // assert(topLeft.y >= ray.y && ray.y >= bottomRight.y);
-      // shoot ray
 
       Point finalColor = shootRay(ray, camera);
       image[x][HEIGHT - y][0] = finalColor.x;
