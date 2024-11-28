@@ -151,7 +151,15 @@ void draw_scene()
       unsigned char r = image[x][y][0] * 255;
       unsigned char g = image[x][y][1] * 255;
       unsigned char b = image[x][y][2] * 255;
-      plot_pixel(x, y, r, g, b);
+
+      plot_pixel_display(x, y, r, g, b);
+      if (mode == MODE_JPEG)
+      {
+        if (y < HEIGHT / 2)
+          plot_pixel_jpeg(x, y, 150, 0, 0);
+        else
+          plot_pixel_jpeg(x, y, 0, 0, 150);
+      }
     }
     glEnd();
     glFlush();
@@ -171,13 +179,6 @@ void plot_pixel_jpeg(int x, int y, unsigned char r, unsigned char g, unsigned ch
   buffer[x][y][0] = r;
   buffer[x][y][1] = g;
   buffer[x][y][2] = b;
-}
-
-void plot_pixel(int x, int y, unsigned char r, unsigned char g, unsigned char b)
-{
-  plot_pixel_display(x, y, r, g, b);
-  if (mode == MODE_JPEG)
-    plot_pixel_jpeg(x, y, r, g, b);
 }
 
 void save_jpg()
@@ -585,17 +586,17 @@ Intersection findClosestIntersection(Point ray, Point P0, bool shadowRay)
 bool shootShadowRay(Point ray, Point P0, int i)
 {
   Point light(lights[i].position);
-  double t_max = (light.x - P0.x) / ray.x;
+  double t_light = (light.x - P0.x) / ray.x;
   Intersection closest = findClosestIntersection(ray, P0, true);
 
   // if no intersection, the shadow ray is not blocked
   if (!closest.isValid())
     return true;
 
-  // if there is an intersection, check if it's greater than t_max
-  //  if it's greater than t_max, the intersection occurs above/past
+  // if there is an intersection, check if it's greater than t_light
+  //  if it's greater than t_light, the intersection occurs above/past
   //  the light, so the ray is unobstructed to the light and we return true.
-  return closest.t > t_max;
+  return closest.t > t_light;
 }
 
 /*
@@ -622,14 +623,18 @@ Point shootRay(Point ray, Point P0)
       Light light = lights[i];
       Point shadowRay = (Point(light.position) - intersection).normalize();
 
+      // fix: make intersection point slightly off the surface to prevent
+      // surface from intersecting itself
+      Point raisedIntersection = intersection + 1e-5 * shadowRay;
+
       // shadow ray not blocked
-      if (shootShadowRay(shadowRay, intersection, i))
+      if (shootShadowRay(shadowRay, raisedIntersection, i))
       {
         // compute phong lighting for each color channel
-        Point N;
-        Point kd;
-        Point ks;
-        double sh;
+        Point N(0, 0, 0);
+        Point kd(0, 0, 0);
+        Point ks(0, 0, 0);
+        double sh = 0;
         if (closest.type == TRIANGLE)
         {
           N = computePhongTriangleNormal(closest.b_coords, closest.i);
@@ -696,10 +701,15 @@ void raytrace()
     }
   }
 
-  int x_start = 0;
+  int x_start = WIDTH - 20;
   int x_end = WIDTH;
-  int y_start = 0;
+  int y_start = HEIGHT - 20;
   int y_end = HEIGHT;
+
+  x_start = 0;
+  x_end = WIDTH;
+  y_start = 0;
+  y_end = HEIGHT;
 
   for (unsigned x = x_start; x < x_end; x++)
   {

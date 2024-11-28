@@ -15,7 +15,7 @@ struct Point
 {
   double x, y, z;
 
-  Point() : valid(false) {}
+  Point() : x(0), y(0), z(0), valid(false) {}
 
   Point(double x, double y, double z) : x(x), y(y), z(z), valid(true) {}
 
@@ -68,6 +68,11 @@ struct Point
   {
     checkIfValid();
     double m = magnitude();
+    
+    // fix: if magnitude is 0 (e.g. point is 0 vector) return
+    if (equal(m, 0))
+      return *this;
+
     x /= m;
     y /= m;
     z /= m;

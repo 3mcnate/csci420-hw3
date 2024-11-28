@@ -3,5 +3,20 @@ n = surface normal
 v = unit vector to viewer
 r = reflection of l at p, r = 2 (l dot n)n - l
 
+27 always intersects with 43
 
-{x:-0.35122141375702226, y:0.038490017945975064, z:-1, valid:true}
+
+Bugs:
+- shininess not working
+- parts of the floor are still not being rendered
+- image output doesn't work correctly (I feel like this is not even my fault)
+
+FIXED
+- Some pixels aren't being shaded for some reason -> DONE
+  ** explanation: shadow rays intersecting with their own origin triangle/sphere 
+  ** fix: make the intersection point slightly off the surface 
+
+- some color not working at all (snow and table scenes) -> DONE
+  ks is NaN for some reason?
+  ** explanation: ks was NaN because normalize() didn't check if magnitude was 0 when dividing
+  ** fix: add divide by zero check to normalize()
