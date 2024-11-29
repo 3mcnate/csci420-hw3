@@ -3,15 +3,22 @@ n = surface normal
 v = unit vector to viewer
 r = reflection of l at p, r = 2 (l dot n)n - l
 
-27 always intersects with 43
+triangle 2 not appearing in siggraph
 
 
 Bugs:
-- shininess not working
 - parts of the floor are still not being rendered
 - image output doesn't work correctly (I feel like this is not even my fault)
 
 FIXED
+- colors are off (too bright) -> DONE
+  ** explanation: the final interpolated values for Ks and Kd were normalized, when they shouldn't have been
+  ** fix: remove normalization of ks and Kd
+  
+- shininess not working -> DONE
+  ** explanation: incorrect Phong Illumination equation (had ks.x * pow(ks.x * RdotV, sh), should be ks.x * pow(RdotV, sh))
+  ** fix: fixed equation 
+
 - Some pixels aren't being shaded for some reason -> DONE
   ** explanation: shadow rays intersecting with their own origin triangle/sphere 
   ** fix: make the intersection point slightly off the surface 

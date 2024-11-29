@@ -208,7 +208,7 @@ void parse_doubles(FILE *file, const char *check, double p[3])
   fscanf(file, "%s", str);
   parse_check(check, str);
   fscanf(file, "%lf %lf %lf", &p[0], &p[1], &p[2]);
-  printf("%s %lf %lf %lf\n", check, p[0], p[1], p[2]);
+  // printf("%s %lf %lf %lf\n", check, p[0], p[1], p[2]);
 }
 
 void parse_rad(FILE *file, double *r)
@@ -217,7 +217,7 @@ void parse_rad(FILE *file, double *r)
   fscanf(file, "%s", str);
   parse_check("rad:", str);
   fscanf(file, "%lf", r);
-  printf("rad: %f\n", *r);
+  // printf("rad: %f\n", *r);
 }
 
 void parse_shi(FILE *file, double *shi)
@@ -226,7 +226,7 @@ void parse_shi(FILE *file, double *shi)
   fscanf(file, "%s", s);
   parse_check("shi:", s);
   fscanf(file, "%lf", shi);
-  printf("shi: %f\n", *shi);
+  // printf("shi: %f\n", *shi);
 }
 
 int loadScene(char *argv)
@@ -252,10 +252,10 @@ int loadScene(char *argv)
   for (int i = 0; i < number_of_objects; i++)
   {
     fscanf(file, "%s\n", type);
-    printf("%s\n", type);
+    // printf("%s\n", type);
     if (strcasecmp(type, "triangle") == 0)
     {
-      printf("found triangle\n");
+      // printf("found triangle\n");
       for (int j = 0; j < 3; j++)
       {
         parse_doubles(file, "pos:", t.v[j].position);
@@ -274,7 +274,7 @@ int loadScene(char *argv)
     }
     else if (strcasecmp(type, "sphere") == 0)
     {
-      printf("found sphere\n");
+      // printf("found sphere\n");
 
       parse_doubles(file, "pos:", s.position);
       parse_rad(file, &s.radius);
@@ -291,7 +291,7 @@ int loadScene(char *argv)
     }
     else if (strcasecmp(type, "light") == 0)
     {
-      printf("found light\n");
+      // printf("found light\n");
       parse_doubles(file, "pos:", l.position);
       parse_doubles(file, "col:", l.color);
 
@@ -513,7 +513,7 @@ Point computePhongKd(Point b_coords, int triangle_idx)
   Point kd1(triangle.v[0].color_diffuse);
   Point kd2(triangle.v[1].color_diffuse);
   Point kd3(triangle.v[2].color_diffuse);
-  return (b_coords.x * kd1 + b_coords.y * kd2 + b_coords.z * kd3).normalize();
+  return (b_coords.x * kd1 + b_coords.y * kd2 + b_coords.z * kd3);
 }
 
 Point computePhongKs(Point b_coords, int triangle_idx)
@@ -522,7 +522,7 @@ Point computePhongKs(Point b_coords, int triangle_idx)
   Point ks1(triangle.v[0].color_specular);
   Point ks2(triangle.v[1].color_specular);
   Point ks3(triangle.v[2].color_specular);
-  return (b_coords.x * ks1 + b_coords.y * ks2 + b_coords.z * ks3).normalize();
+  return (b_coords.x * ks1 + b_coords.y * ks2 + b_coords.z * ks3);
 }
 
 double computePhongSh(Point b_coords, int triangle_idx)
@@ -543,9 +543,9 @@ Point computePhongIllumination(Point lightColor, Point kd, Point L, Point N, Poi
   if (RdotV < 0)
     RdotV = 0;
 
-  double r = lightColor.x * (kd.x * LdotN + ks.x * pow(ks.x * RdotV, sh));
-  double g = lightColor.y * (kd.y * LdotN + ks.y * pow(ks.y * RdotV, sh));
-  double b = lightColor.z * (kd.z * LdotN + ks.z * pow(ks.z * RdotV, sh));
+  double r = lightColor.x * (kd.x * LdotN + ks.x * pow(RdotV, sh));
+  double g = lightColor.y * (kd.y * LdotN + ks.y * pow(RdotV, sh));
+  double b = lightColor.z * (kd.z * LdotN + ks.z * pow(RdotV, sh));
 
   return Point(r, g, b);
 }
@@ -625,7 +625,7 @@ Point shootRay(Point ray, Point P0)
 
       // fix: make intersection point slightly off the surface to prevent
       // surface from intersecting itself
-      Point raisedIntersection = intersection + 1e-5 * shadowRay;
+      Point raisedIntersection = intersection + 2e-5 * shadowRay;
 
       // shadow ray not blocked
       if (shootShadowRay(shadowRay, raisedIntersection, i))
@@ -676,12 +676,6 @@ void raytrace()
   double x_step = width / (double)WIDTH;
   double y_step = height / (double)HEIGHT;
 
-  cout << "width:  " << width << endl;
-  cout << "height: " << height << endl;
-  cout << "x_step: " << x_step << endl;
-  cout << "y_step: " << y_step << endl;
-  cout << endl;
-
   cout << "num_triangles: " << num_triangles << endl;
   cout << "num_spheres:   " << num_spheres << endl;
   cout << "num_lights:    " << num_lights << endl;
@@ -701,10 +695,10 @@ void raytrace()
     }
   }
 
-  int x_start = WIDTH - 20;
-  int x_end = WIDTH;
-  int y_start = HEIGHT - 20;
-  int y_end = HEIGHT;
+  int x_start = 0;
+  int x_end = x_start + 20;
+  int y_start = HEIGHT / 2;
+  int y_end = y_start + 20;
 
   x_start = 0;
   x_end = WIDTH;
@@ -727,6 +721,9 @@ void raytrace()
       image[x][HEIGHT - y][2] = finalColor.z;
     }
   }
+
+  int num_pixels = (x_end - x_start) * (y_end - y_start);
+  cout << "Drew " << num_pixels << " pixels." << endl;
 }
 
 int main(int argc, char **argv)
