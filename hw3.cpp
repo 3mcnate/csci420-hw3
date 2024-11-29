@@ -49,14 +49,14 @@ int mode = MODE_DISPLAY;
 // While solving the homework, it is useful to make the below values smaller for debugging purposes.
 // The still images that you need to submit with the homework should be at the below resolution (640x480).
 // However, for your own purposes, after you have solved the homework, you can increase those values to obtain higher-resolution images.
-#define WIDTH 320
-#define HEIGHT 240
+#define WIDTH 640
+#define HEIGHT 480
 
 // The field of view of the camera, in degrees.
 #define fov 60.0
 
 // Buffer to store the image when saving it to a JPEG.
-unsigned char buffer[WIDTH][HEIGHT][3];
+unsigned char buffer[HEIGHT][WIDTH][3];
 
 // buffer to hold image as we do ray tracing
 float image[WIDTH][HEIGHT][3];
@@ -148,17 +148,17 @@ void draw_scene()
     {
       // A simple R,G,B output for testing purposes.
       // Modify these R,G,B colors to the values computed by your ray tracer.
-      unsigned char r = image[x][y][0] * 255;
-      unsigned char g = image[x][y][1] * 255;
-      unsigned char b = image[x][y][2] * 255;
+      unsigned char r = (unsigned char)(image[x][y][0] * 255);
+      unsigned char g = (unsigned char)(image[x][y][1] * 255);
+      unsigned char b = (unsigned char)(image[x][y][2] * 255);
 
       plot_pixel_display(x, y, r, g, b);
       if (mode == MODE_JPEG)
       {
         if (y < HEIGHT / 2)
-          plot_pixel_jpeg(x, y, 150, 0, 0);
+          plot_pixel_jpeg(x, y, r, g, b);
         else
-          plot_pixel_jpeg(x, y, 0, 0, 150);
+          plot_pixel_jpeg(x, y, r, g, b);
       }
     }
     glEnd();
@@ -176,9 +176,9 @@ void plot_pixel_display(int x, int y, unsigned char r, unsigned char g, unsigned
 
 void plot_pixel_jpeg(int x, int y, unsigned char r, unsigned char g, unsigned char b)
 {
-  buffer[x][y][0] = r;
-  buffer[x][y][1] = g;
-  buffer[x][y][2] = b;
+  buffer[y][x][0] = r;
+  buffer[y][x][1] = g;
+  buffer[y][x][2] = b;
 }
 
 void save_jpg()

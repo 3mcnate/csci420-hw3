@@ -8,22 +8,25 @@ triangle 2 not appearing in siggraph
 
 Bugs:
 - parts of the floor are still not being rendered
-- image output doesn't work correctly (I feel like this is not even my fault)
 
 FIXED
-- colors are off (too bright) -> DONE
-  ** explanation: the final interpolated values for Ks and Kd were normalized, when they shouldn't have been
-  ** fix: remove normalization of ks and Kd
-  
-- shininess not working -> DONE
-  ** explanation: incorrect Phong Illumination equation (had ks.x * pow(ks.x * RdotV, sh), should be ks.x * pow(RdotV, sh))
-  ** fix: fixed equation 
+- image output doesn't work correctly (I feel like this is not even my fault) -> DONE
+  - explanation: x and y were flipped, needs to be buffer[height][width] and buffer[y][x]
 
-- Some pixels aren't being shaded for some reason -> DONE
-  ** explanation: shadow rays intersecting with their own origin triangle/sphere 
-  ** fix: make the intersection point slightly off the surface 
+- colors are off (too bright) -> DONE
+  - explanation: the final interpolated values for Ks and Kd were normalized, when they shouldn't have been
+  - fix: remove normalization of ks and Kd
+
+- shininess not working -> DONE
+  - explanation: incorrect Phong Illumination equation (had ks.x * pow(ks.x * RdotV, sh), should be ks.x * pow(RdotV, sh))
+  - fix: fixed equation 
+
+- Some pixels aren't being shaded in weird TV static pattern -> DONE
+  - explanation: due to floating point imprecision, shadow rays were intersecting with their own origin triangle/sphere 
+  - fix: make the intersection point slightly off the surface by adding a small t_value times the shadowRay direction
 
 - some color not working at all (snow and table scenes) -> DONE
   ks is NaN for some reason?
-  ** explanation: ks was NaN because normalize() didn't check if magnitude was 0 when dividing
-  ** fix: add divide by zero check to normalize()
+  - explanation: ks was NaN because normalize() didn't check if magnitude was 0 when dividing. Then the NaN propagated
+    through on every floating point calculation
+  - fix: normalize() doesn't do anything if magnitude is zero
