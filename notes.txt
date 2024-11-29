@@ -3,13 +3,31 @@ n = surface normal
 v = unit vector to viewer
 r = reflection of l at p, r = 2 (l dot n)n - l
 
-triangle 2 not appearing in siggraph
+i == 0:
+  A: {x:0.007812501848093234, y:-5.0000009462237358, z:-70, valid:true} ????
+  B: {x:125, y:-5, z:-70, valid:true}
+  C: {x:-125, y:-5, z:0, valid:true}
+
+i == 2:
+  A: {x:-125, y:-5, z:-70, valid:true}
+  B: {x:125, y:-5, z:-70, valid:true}
+  C: {x:-125, y:-5, z:0, valid:true}
+
 
 
 Bugs:
-- parts of the floor are still not being rendered
+  NONEEEEEEE :DDDD HOLY FUCK LETS FUCKING GOOOOO
+  SUBMITTED AT EACTLY 11;59 HOLY FUCKSHIT
 
 FIXED
+- parts of the floor are still not being rendered -> DONE
+  - explanation: this was a NASTY memory access bug. I noticed that the first floating point value for the first vertex of the first 
+    triangle in a scene was completely wrong. I checked that the scene data was being loaded in properly, and it was. However, after
+    calling raytrace(), the number was inexplicably different (e.g. -125.0 -> 0.0078125). After stepping through the code line by line,
+    I realized the value was changed after setting the screen to all white. Turns out it was due to an array access out of bounds, thus 
+    overwriting the first double in the vertex position. I was accessing the image array at image[x][HEIGHT - y], when it should have 
+    image[x][HEIGHT - y - 1]. The size of the array was image[WIDTH][HEIGHT]. Insane rookie error. 
+
 - image output doesn't work correctly (I feel like this is not even my fault) -> DONE
   - explanation: x and y were flipped, needs to be buffer[height][width] and buffer[y][x]
 

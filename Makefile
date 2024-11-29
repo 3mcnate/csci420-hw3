@@ -11,8 +11,8 @@ CXX_OBJ=$(HW3_OBJ) $(IMAGE_LIB_OBJ)
 
 CXX=g++
 TARGET=hw3
-CXXFLAGS=-DGLM_FORCE_RADIANS -Wno-unused-result -std=c++11 -g 
-OPT=
+CXXFLAGS=-DGLM_FORCE_RADIANS -Wno-unused-result -std=c++11 -Wall
+OPT=-O3
 
 UNAME_S=$(shell uname -s)
 

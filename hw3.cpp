@@ -56,6 +56,7 @@ int mode = MODE_DISPLAY;
 #define fov 60.0
 
 // Buffer to store the image when saving it to a JPEG.
+// FIX: needs to be height then width, not width then height
 unsigned char buffer[HEIGHT][WIDTH][3];
 
 // buffer to hold image as we do ray tracing
@@ -185,6 +186,7 @@ void save_jpg()
 {
   printf("Saving JPEG file: %s\n", filename);
 
+  // fix: needs to be width, then height here (retarded)
   ImageIO img(WIDTH, HEIGHT, 3, &buffer[0][0][0]);
   if (img.save(filename, ImageIO::FORMAT_JPEG) != ImageIO::OK)
     printf("Error in saving\n");
@@ -252,7 +254,7 @@ int loadScene(char *argv)
   for (int i = 0; i < number_of_objects; i++)
   {
     fscanf(file, "%s\n", type);
-    // printf("%s\n", type);
+    printf("%s\n", type);
     if (strcasecmp(type, "triangle") == 0)
     {
       // printf("found triangle\n");
@@ -689,21 +691,16 @@ void raytrace()
   {
     for (unsigned y = 0; y < HEIGHT; y++)
     {
-      image[x][HEIGHT - y][0] = 1;
-      image[x][HEIGHT - y][1] = 1;
-      image[x][HEIGHT - y][2] = 1;
+      image[x][HEIGHT - y - 1][0] = 1;
+      image[x][HEIGHT - y - 1][1] = 1;
+      image[x][HEIGHT - y - 1][2] = 1;
     }
   }
 
-  int x_start = 0;
-  int x_end = x_start + 20;
-  int y_start = HEIGHT / 2;
-  int y_end = y_start + 20;
-
-  x_start = 0;
-  x_end = WIDTH;
-  y_start = 0;
-  y_end = HEIGHT;
+  unsigned x_start = 0;
+  unsigned x_end = WIDTH;
+  unsigned y_start = 0;
+  unsigned y_end = HEIGHT;
 
   for (unsigned x = x_start; x < x_end; x++)
   {
@@ -716,9 +713,9 @@ void raytrace()
       ray.normalize();
 
       Point finalColor = shootRay(ray, camera);
-      image[x][HEIGHT - y][0] = finalColor.x;
-      image[x][HEIGHT - y][1] = finalColor.y;
-      image[x][HEIGHT - y][2] = finalColor.z;
+      image[x][HEIGHT - y - 1][0] = finalColor.x;
+      image[x][HEIGHT - y - 1][1] = finalColor.y;
+      image[x][HEIGHT - y - 1][2] = finalColor.z;
     }
   }
 
